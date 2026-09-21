@@ -57,11 +57,9 @@ services:
         value: "3.13.6"
 
   # --------------------------------------------------------------- frontend --
-  - type: web
+  - type: static
     name: orbit-frontend
-    runtime: static
     rootDir: orbit-frontend
-    plan: free
     autoDeploy: true
     buildCommand: npm ci && npm run build
     # With rootDir set, the publish dir is relative to that root.
