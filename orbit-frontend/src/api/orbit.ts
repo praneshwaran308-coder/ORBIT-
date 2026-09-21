@@ -1,6 +1,11 @@
 import type { AgentResult, HealthInfo, RunAccepted, RunSummary } from '../types/orbit'
 
-const BASE = '/api'
+/**
+ * API base URL: '/api' in development (Vite dev proxy strips the prefix;
+ * see vite.config.ts). In hosted builds, VITE_API_BASE supplies the backend
+ * origin directly (backend routes live at root, e.g. https://<backend>/health).
+ */
+const BASE = import.meta.env.VITE_API_BASE ?? '/api'
 
 async function handle<T>(res: Response): Promise<T> {
   if (!res.ok) {
