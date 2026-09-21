@@ -1,0 +1,57 @@
+# ORBIT production Caddyfile
+#
+# Serves the built SPA and reverse-proxies /api/* to the local backend,
+# stripping the /api prefix (mirrors the Vite dev proxy exactly).
+#
+# The site address comes from the DOMAIN environment variable when Caddy
+# loads this file, e.g.:
+#   DOMAIN=orbit.example.com caddy run --config /etc/caddy/Caddyfile
+# Set DOMAIN to the real DNS name of the host to get automatic HTTPS
+# (Let's Encrypt/ZeroSSL certificates are obtained and renewed for you).
+#
+# For a smoke test without DNS, replace "{$DOMAIN}" with ":80" or use
+# "localhost" (self-signed local TLS) — never expose the result as-is.
+
+{$DOMAIN} {
+	# --- compression ---------------------------------------------------------
+	encode zstd gzip
+
+	# --- baseline security headers -------------------------------------------
+	header {
+		-Server
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Strict-Transport-Security "max-age=31536000"
+	}
+
+	# --- API docs are a development feature; never expose them ---------------
+	@docs path /docs /redoc /openapi.json
+	respond @docs 404
+
+	# --- API: /api/* -> FastAPI on loopback, /api stripped -------------------
+	handle /api/* {
+		request_body {
+			max_size 25MB
+		}
+		uri strip_prefix /api
+		reverse_proxy 127.0.0.1:8000 {
+			transport http {
+				dial_timeout 5s
+				response_header_timeout 60s
+			}
+		}
+	}
+
+	# --- Frontend: built SPA with history-routing fallback -------------------
+	handle {
+		root * /srv/orbit/orbit-frontend/dist
+
+		# Hashed assets are immutable; index.html must always revalidate.
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+		header /index.html Cache-Control "no-cache"
+
+		try_files {path} /index.html
+		file_server
+	}
+}

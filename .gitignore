@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Secrets & local data
+.env
+*.db
+desktop-v2.db*
+.data/
+!**/.data/.gitkeep
+deploy/orbit.env.local
+
+# Logs & Freebuff session artifacts
+*.log
+*.log.err
+.freebuff/
+_tmp/
+
+# Node / frontend (dist/ is generated during deployment: npm run build)
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# OS / editor
+.DS_Store
+Thumbs.db

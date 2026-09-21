@@ -1,0 +1,38 @@
+# ORBIT backend systemd unit
+#
+# Install as /etc/systemd/system/orbit.service, then:
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now orbit
+#
+# Constraints baked in:
+#   - exactly ONE uvicorn worker (task/run registry is in-memory; more
+#     workers would split Runs state across processes)
+#   - binds to 127.0.0.1 only — the backend is never exposed directly;
+#     Caddy is the only internet-facing process
+#   - dedicated non-root 'orbit' user
+#   - production environment from /etc/orbit/orbit.env (chmod 600 root:orbit)
+
+[Unit]
+Description=ORBIT backend (FastAPI via uvicorn, single worker)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=orbit
+Group=orbit
+EnvironmentFile=/etc/orbit/orbit.env
+WorkingDirectory=/srv/orbit/orbit-backend
+ExecStart=/srv/orbit/orbit-backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1
+Restart=always
+RestartSec=3
+
+# Defense-in-depth for a network-adjacent service.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/orbit/orbit-backend/.data
+
+[Install]
+WantedBy=multi-user.target
