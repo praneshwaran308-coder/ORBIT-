@@ -57,8 +57,9 @@ services:
         value: "3.13.6"
 
   # --------------------------------------------------------------- frontend --
-  - type: static
+  - type: web
     name: orbit-frontend
+    runtime: static
     rootDir: orbit-frontend
     autoDeploy: true
     buildCommand: npm ci && npm run build
