@@ -70,8 +70,10 @@ services:
     rootDir: orbit-frontend
     autoDeploy: true
     buildCommand: npm ci && npm run build
-    # With rootDir set, the publish dir is relative to that root.
-    staticPublishPath: dist
+    # staticPublishPath is resolved relative to the REPO ROOT (per Render's
+    # Blueprint spec), NOT rootDir — so it must include the orbit-frontend
+    # prefix even though the build itself runs inside rootDir.
+    staticPublishPath: orbit-frontend/dist
     # VITE_API_BASE is a BUILD-time variable (Vite inlines it): the backend's
     # bare public origin — NO /api suffix (backend routes live at root), NO
     # trailing slash. A Blueprint cannot know the URL Render will assign, so a
