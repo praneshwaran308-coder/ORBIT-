@@ -70,12 +70,13 @@ services:
     rootDir: orbit-frontend
     autoDeploy: true
     buildCommand: npm ci && npm run build
-    # staticPublishPath is resolved relative to rootDir, NOT the repo root —
-    # confirmed by Render's deploy log: with the repo-root form it failed with
-    # "Publish directory orbit-frontend/dist does not exist!" while the build
-    # emitted dist/ inside rootDir. The build runs in rootDir, so the publish
-    # path is plain `dist`.
-    staticPublishPath: dist
+    # staticPublishPath is resolved relative to the REPO ROOT — confirmed
+    # empirically on Render, twice: `orbit-frontend/dist` deployed successfully
+    # (site went Live), while `dist` failed with "Publish directory
+    # orbit-frontend/dist does not exist!" — Render prints the failing path
+    # rootDir-joined even though the check resolves from the repo root, which
+    # is what caused the earlier flip-flop. Do NOT simplify this to `dist`.
+    staticPublishPath: orbit-frontend/dist
     # VITE_API_BASE is a BUILD-time variable (Vite inlines it): the backend's
     # bare public origin — NO /api suffix (backend routes live at root), NO
     # trailing slash. A Blueprint cannot know the URL Render will assign, so a
