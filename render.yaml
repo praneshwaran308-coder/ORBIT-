@@ -1,25 +1,33 @@
-# ORBIT — Render Blueprint (free-tier: one web service + one static site)
+# ◍ ORBIT — Render Blueprint (free-tier: backend web service)
 #
-# Render Blueprint spec: https://render.com/docs/blueprint-spec
+# Render Blueprint spec:
+# https://render.com/docs/blueprint-spec
 #
-# Deployment model (Render has no server-side proxy like the Caddy setup in
-# deploy/ — that VPS package is intentionally untouched as an alternative
-# target):
-#   - Frontend static site calls the backend directly. The backend exposes its
-#     routes at ROOT (/health, /run, /status/{id}, /runs — there is NO /api
-#     prefix), so VITE_API_BASE below is the backend's bare origin (no /api
-#     suffix). Inside orbit.ts, BASE = VITE_API_BASE ?? '/api'.
-#   - The /* rewrite below only backstops SPA deep links (Render static sites
-#     already fall back to index.html); it never intercepts backend calls
-#     because those target the backend origin, not this site.
+# Deployment model:
+#   - The production frontend is maintained as a separate Render Static Site.
+#   - The Blueprint manages only the backend.
+#   - The frontend calls the backend directly.
 #
-# Secrets and cross-service URLs: FREEBUFF_API_KEY is `sync: false` — its
-# VALUE is entered once in the Render dashboard and never lives in Git.
-# VITE_API_BASE / CORS_ORIGINS use `generateValue: true`: Render cannot
-# resolve service URLs inside a Blueprint (fromService exposes private-network
-# host/port only, never the public onrender.com URL), so the placeholder is
-# generated at creation and replaced with the real origin in the dashboard —
-# see the deploy sequence in the CORS/VITE comments below.
+# Backend routes are exposed at ROOT:
+#   /health
+#   /run
+#   /status/{id}
+#   /runs
+#
+# There is NO /api prefix.
+#
+# Secrets:
+#   FREEBUFF_API_KEY uses sync: false.
+#   Its value is entered in the Render dashboard and is never stored in Git.
+#
+# Production frontend:
+#   https://orbit-frontend-z1ak.onrender.com
+#
+# Production backend:
+#   https://orbit-backend-qojk.onrender.com
+#
+# CORS_ORIGINS is the exact public frontend origin and is configured
+# explicitly below so Blueprint syncs do not generate a random value.
 
 services:
   # ---------------------------------------------------------------- backend --
@@ -28,74 +36,45 @@ services:
     runtime: python
     rootDir: orbit-backend
     plan: free
-    # Pinned deps (requirements.txt): fastapi 0.141.1, uvicorn[standard] 0.53.0,
-    # pandas 3.0.6, scikit-learn 1.9.1, ... — versions that support Python 3.13.
+
+    # Pinned dependencies from requirements.txt.
     buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1
+
     healthCheckPath: /health
+
     autoDeploy: true
+
     envVars:
-      # ---- secret (value entered in the Render dashboard ONLY; never in Git)
+      # ---- secret -----------------------------------------------------------
+      # Value is entered in the Render dashboard only.
       - key: FREEBUFF_API_KEY
         sync: false
-      # ---- provider / model (non-secret; edit freely in the dashboard)
+
+      # ---- provider / model -------------------------------------------------
       - key: FREEBUFF_BASE_URL
         value: https://openrouter.ai/api/v1
+
       - key: FREEBUFF_MODEL
         value: openai/gpt-4o-mini
-      # ---- CORS: the EXACT public frontend origin. A Blueprint cannot know
-      #      it (Render assigns the URL at creation), so a placeholder is
-      #      generated here and replaced in the dashboard AFTER creation:
-      #      backend -> Env -> CORS_ORIGINS -> paste the frontend URL (no
-      #      trailing slash) -> Save. Runtime-read; no rebuild needed.
-      #      Probe: curl -H "Origin: <frontend-url>" -i
-      #      https://<backend-url>/health | grep access-control-allow-origin
+
+      # ---- CORS -------------------------------------------------------------
+      # Exact public production frontend origin.
+      # No trailing slash.
       - key: CORS_ORIGINS
         value: https://orbit-frontend-z1ak.onrender.com
-      # ---- production-safe limits (unchanged behavior, just explicit)
+
+      # ---- production-safe limits ------------------------------------------
       - key: MAX_UPLOAD_BYTES
-        value: "10485760" # 10 MB (Render free body cap is 100 MB; app limit binds first)
+        value: "10485760"
+
       - key: TASK_TIMEOUT_SECONDS
         value: "120"
+
       - key: ENABLE_API_DOCS
-        value: "0" # /docs, /redoc, /openapi.json disabled in production
-      # Render injects PYTHON_VERSION; pin it for reproducible builds.
+        value: "0"
+
+      # ---- Python version ---------------------------------------------------
       - key: PYTHON_VERSION
         value: "3.13.6"
-
-  # --------------------------------------------------------------- frontend --
-  - type: web
-    name: orbit-frontend
-    runtime: static
-    rootDir: orbit-frontend
-    autoDeploy: true
-    buildCommand: npm ci && npm run build
-    # staticPublishPath is resolved relative to the REPO ROOT — confirmed
-    # empirically on Render, twice: `orbit-frontend/dist` deployed successfully
-    # (site went Live), while `dist` failed with "Publish directory
-    # orbit-frontend/dist does not exist!" — Render prints the failing path
-    # rootDir-joined even though the check resolves from the repo root, which
-    # is what caused the earlier flip-flop. Do NOT simplify this to `dist`.
-    staticPublishPath: orbit-frontend/dist
-    # VITE_API_BASE is a BUILD-time variable (Vite inlines it): the backend's
-    # bare public origin — NO /api suffix (backend routes live at root), NO
-    # trailing slash. A Blueprint cannot know the URL Render will assign, so a
-    # placeholder is generated here and replaced in the dashboard AFTER both
-    # services exist: frontend -> Env -> VITE_API_BASE -> paste the backend
-    # URL -> Save -> Deploys -> "Redeploy Deploy" (Vite embeds it at build
-    # time; without the redeploy the bundle keeps the placeholder).
-    envVars:
-      - key: VITE_API_BASE
-        value: https://orbit-backend-qojk.onrender.com
-    headers:
-      # Long-cache the fingerprinted Vite assets.
-      - path: /assets/*
-        name: Cache-Control
-        value: public, max-age=31536000, immutable
-    # SPA fallback for React deep links (e.g. /flow, /runs opened directly).
-    # Render static sites already fall back to index.html; this makes it
-    # explicit and protects it against changes to that default behavior.
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
