@@ -51,7 +51,7 @@ services:
       #      Probe: curl -H "Origin: <frontend-url>" -i
       #      https://<backend-url>/health | grep access-control-allow-origin
       - key: CORS_ORIGINS
-        generateValue: true
+        value: https://orbit-frontend-z1ak.onrender.com
       # ---- production-safe limits (unchanged behavior, just explicit)
       - key: MAX_UPLOAD_BYTES
         value: "10485760" # 10 MB (Render free body cap is 100 MB; app limit binds first)
@@ -86,7 +86,7 @@ services:
     # time; without the redeploy the bundle keeps the placeholder).
     envVars:
       - key: VITE_API_BASE
-        generateValue: true
+        value: https://orbit-backend-qojk.onrender.com
     headers:
       # Long-cache the fingerprinted Vite assets.
       - path: /assets/*
